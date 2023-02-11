@@ -3,6 +3,14 @@ import { onChildAdded, push, ref, set } from "firebase/database";
 import { database } from "./firebase";
 import logo from "./logo.png";
 import "./App.css";
+import Input from "./Component/Input";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
 // Save the Firebase message folder name as a constant to avoid bugs due to misspelling
 const DB_MESSAGES_KEY = "messages";
@@ -14,6 +22,7 @@ class App extends React.Component {
     // When Firebase changes, update local state, which will update local UI
     this.state = {
       messages: [],
+      input: "",
     };
   }
 
@@ -30,29 +39,46 @@ class App extends React.Component {
   }
 
   // Note use of array fields syntax to avoid having to manually bind this method to the class
-  writeData = () => {
+  writeData = (data) => {
+    const currentTime = new Date().toLocaleTimeString();
+
+    const chat = {
+      text: data,
+      timestamp: currentTime,
+    };
+
     const messageListRef = ref(database, DB_MESSAGES_KEY);
     const newMessageRef = push(messageListRef);
-    set(newMessageRef, "abc");
+    set(newMessageRef, chat);
   };
 
   render() {
     // Convert messages in state to message JSX elements to render
     let messageListItems = this.state.messages.map((message) => (
-      <li key={message.key}>{message.val}</li>
+      <li key={message.key}>
+        {message.val.text}
+        <br />
+        {message.val.timestamp}
+      </li>
     ));
     return (
-      <div className="App">
-        <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <p>
-            Edit <code>src/App.js</code> and save to reload.
-          </p>
-          {/* TODO: Add input field and add text input as messages in Firebase */}
-          <button onClick={this.writeData}>Send</button>
-          <ol>{messageListItems}</ol>
-        </header>
-      </div>
+      <ThemeProvider theme={darkTheme}>
+        <div className="App">
+          <header className="App-header">
+            <img src={logo} className="App-logo" alt="logo" />
+            <p>
+              Edit <code>src/App.js</code> and save to reload.
+            </p>
+            {/* TODO: Add input field and add text input as messages in Firebase */}
+            <Input
+              // handleChange={this.handleChange}
+              handleSubmit={this.writeData}
+            />
+            {/* <button onClick={this.writeData}>Send</button> */}
+            <ol>{messageListItems}</ol>
+          </header>
+        </div>
+      </ThemeProvider>
     );
   }
 }
