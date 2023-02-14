@@ -1,5 +1,7 @@
 import React from "react";
-import { TextField, Button } from "@mui/material";
+import { TextField, Button, IconButton, Grid, Paper } from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import { grey } from "@mui/material/colors";
 
 class Input extends React.Component {
   constructor(props) {
@@ -27,20 +29,37 @@ class Input extends React.Component {
   render() {
     return (
       <>
-        <form onSubmit={this.handleSubmit}>
-          <TextField
-            id="outlined-basic"
-            label="Enter Message"
-            variant="outlined"
-            required
-            size="small"
-            onChange={this.handleChange}
-            value={this.state.input}
-          />
-          <Button variant="contained" type="submit">
-            Send
-          </Button>
-        </form>
+        <Paper
+          sx={{
+            padding: "15px",
+            // backgroundColor: "#F1F1F1",
+            borderTop: "solid 1px #CCCCCC",
+            borderRadius: "10px",
+          }}
+        >
+          <form onSubmit={this.handleSubmit}>
+            <Grid container justifyContent="space-between">
+              <Grid item xs={11}>
+                <TextField
+                  id="outlined-basic"
+                  label="Enter Message"
+                  variant="standard"
+                  required
+                  multiline
+                  size="small"
+                  onChange={this.handleChange}
+                  value={this.state.input}
+                  sx={{ width: "100%" }}
+                />
+              </Grid>
+              <Grid item xs={1}>
+                <IconButton type="submit">
+                  <SendIcon sx={{ color: grey[900] }} />
+                </IconButton>
+              </Grid>
+            </Grid>
+          </form>
+        </Paper>
       </>
     );
   }
