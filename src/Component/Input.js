@@ -8,22 +8,52 @@ class Input extends React.Component {
     super(props);
     this.state = {
       input: "",
+      inputValidity: true,
     };
   }
 
+  inputValidation = (input) => {
+    if (input.length <= 0 || input === "\n") {
+      this.setState({
+        inputValidity: false,
+      });
+      return false;
+    } else {
+      this.setState({
+        inputValidity: true,
+      });
+      return true;
+    }
+  };
+
   handleChange = (event) => {
+    this.inputValidation(event.target.value);
     const data = event.target.value;
     this.setState({
       input: data,
     });
   };
 
+  handleKeyDown = (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      this.handleSubmit(event);
+    }
+  };
+
   handleSubmit = (event) => {
     event.preventDefault();
-    this.props.handleSubmit(event.target[0].value);
-    this.setState({
-      input: "",
-    });
+    if (this.state.input.length <= 0 || this.state.input === "\n") {
+      this.setState({
+        inputValidity: false,
+      });
+      return null;
+    } else {
+      this.props.handleSubmit(this.state.input);
+      this.setState({
+        input: "",
+        inputValidity: true,
+      });
+    }
   };
 
   render() {
@@ -32,7 +62,6 @@ class Input extends React.Component {
         <Paper
           sx={{
             padding: "15px",
-            // backgroundColor: "#F1F1F1",
             borderTop: "solid 1px #CCCCCC",
             borderRadius: "10px",
           }}
@@ -48,8 +77,15 @@ class Input extends React.Component {
                   multiline
                   size="small"
                   onChange={this.handleChange}
+                  onKeyDown={this.handleKeyDown}
                   value={this.state.input}
                   sx={{ width: "100%" }}
+                  error={!this.state.inputValidity}
+                  helperText={
+                    !this.state.inputValidity
+                      ? "Please fill in this field"
+                      : null
+                  }
                 />
               </Grid>
               <Grid item xs={1}>
