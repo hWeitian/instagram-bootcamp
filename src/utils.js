@@ -31,3 +31,26 @@ export const findPost = (postArr, postKey) => {
 
   return requiredPost;
 };
+
+export const findUser = (userObj, uid) => {
+  for (const property in userObj) {
+    if (userObj[property].userUid === uid) {
+      return userObj[property];
+    }
+  }
+};
+
+export const setErrorMessage = (errorCode) => {
+  let errorMsg = "Sorry, ";
+  switch (errorCode) {
+    case "auth/wrong-password":
+      errorMsg += "wrong Password, please try again";
+      break;
+    case "auth/user-not-found":
+      errorMsg = "unable to find user, please sign up a new account";
+      break;
+    default:
+      errorMsg = "";
+  }
+  return errorMsg;
+};

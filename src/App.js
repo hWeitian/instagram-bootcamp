@@ -6,30 +6,26 @@ import {
   set,
   update,
   onValue,
+  get,
 } from "firebase/database";
 import { uploadBytes, getDownloadURL, ref as sRef } from "firebase/storage";
 import { database, storage } from "./firebase";
-import logo from "./logo.png";
+import { auth } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import "./App.css";
-import Input from "./Component/Input";
 import ChatMessage from "./Component/ChatMessage";
 import SubmitPost from "./Component/SubmitPost";
 import Post from "./Component/Post";
 import Header from "./Component/Header";
 import MessageBox from "./Component/MessageBox";
-import { generateImageName, getCurrentDate, findPost } from "./utils";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { Paper, Container, Grid } from "@mui/material";
-
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-  },
-});
+import Login from "./Component/Login";
+import { generateImageName, getCurrentDate, findPost, findUser } from "./utils";
+import { Container, Grid } from "@mui/material";
 
 // Save the Firebase message folder name as a constant to avoid bugs due to misspelling
 const DB_MESSAGES_KEY = "messages";
 const DB_POSTS_KEY = "posts";
+const DB_USERS_KEY = "users";
 
 class App extends React.Component {
   constructor(props) {
@@ -43,13 +39,17 @@ class App extends React.Component {
       imageUrl: "",
       posts: [],
       previewLink: "",
+      displayModal: false,
       currentPage: "home",
+      userUid: "",
+      displayName: "",
+      userKey: "",
     };
   }
 
   componentDidMount() {
+    // Create reference to messages database
     const messagesRef = ref(database, DB_MESSAGES_KEY);
-    const postsRef = ref(database, DB_POSTS_KEY);
     // onChildAdded will return data for every child at the reference and every subsequent new child
     onChildAdded(messagesRef, (data) => {
       // Add the subsequent child to local component state, initialising a new array to trigger re-render
@@ -59,23 +59,55 @@ class App extends React.Component {
       }));
     });
 
+    // Create reference to posts database
+    const postsRef = ref(database, DB_POSTS_KEY);
+    // Track changes to post database and update state
     onValue(postsRef, (data) => {
       const newData = data.val();
-
       const newPosts = [];
-      for (const property in newData) {
-        newPosts.push({
-          key: newData[property].key,
-          caption: newData[property].caption,
-          imageLink: newData[property].imageLink,
-          date: newData[property].date,
-          likes: newData[property].likes,
+
+      // Get details of user who made the post
+      // const userUid = newData[property].userUid;
+      const userRef = ref(database, DB_USERS_KEY);
+
+      get(userRef).then((snapshot) => {
+        for (const property in newData) {
+          const uid = newData[property].userUid;
+          const user = findUser(snapshot.val(), uid);
+          newPosts.push({
+            key: newData[property].postKey,
+            caption: newData[property].caption,
+            imageLink: newData[property].imageLink,
+            date: newData[property].date,
+            likes: newData[property].likes,
+            userUid: newData[property].userUid,
+            userName: user.userName,
+          });
+        }
+        this.setState((state) => ({
+          // Store message key so we can use it as a key in our list items when rendering messages
+          posts: newPosts,
+        }));
+      });
+    });
+
+    //Track user's login status
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in, see docs for a list of available properties
+        console.log(`${user.email} - ${user.displayName}`);
+
+        this.setState({
+          userUid: user.uid,
+          displayName: user.displayName,
+        });
+      } else {
+        console.log("User signed out");
+        this.setState({
+          userUid: "",
+          displayName: "",
         });
       }
-      this.setState((state) => ({
-        // Store message key so we can use it as a key in our list items when rendering messages
-        posts: newPosts,
-      }));
     });
   }
 
@@ -94,12 +126,6 @@ class App extends React.Component {
   };
 
   handleFileInput = (event) => {
-    // if (this.state.fileInput) {
-    //   localStorage.clear();
-    //   console.log("removed");
-    //   // URL.revokeObjectURL(this.state.fileInput);
-    // }
-
     this.setState(
       {
         fileInput: event.target.files[0],
@@ -142,7 +168,8 @@ class App extends React.Component {
           caption: captionText,
           date: currentDate,
           likes: 0,
-          key: newPostKey,
+          postKey: newPostKey,
+          userUid: this.state.userUid,
         };
 
         set(newPostRef, post);
@@ -152,6 +179,21 @@ class App extends React.Component {
         //   fileInput: "",
         // });
       });
+  };
+
+  addUserToDb = (userCredential, userName) => {
+    const usersListRef = ref(database, DB_USERS_KEY);
+    const newUserRef = push(usersListRef);
+
+    const user = {
+      userUid: userCredential.user.uid,
+      userName: userName,
+      postId: "",
+      userKey: newUserRef.key,
+    };
+    set(newUserRef, user);
+
+    return newUserRef.key;
   };
 
   handleLikes = (postKey, type) => {
@@ -181,6 +223,35 @@ class App extends React.Component {
     });
   };
 
+  handleModalClose = () => {
+    this.setState({
+      displayModal: false,
+    });
+  };
+
+  handleModalOpen = () => {
+    this.setState({
+      displayModal: true,
+    });
+  };
+
+  updateDisplayName = (name, key) => {
+    this.setState({
+      displayName: name,
+      userKey: key,
+    });
+  };
+
+  handleSignOut = () => {
+    signOut(auth)
+      .then(() => {
+        console.log("Sign out successful");
+      })
+      .catch((error) => {
+        console.log(`${error.code} - ${error.message}`);
+      });
+  };
+
   render() {
     // Convert messages in state to message JSX elements to render
     let messageListItems = this.state.messages.map((message) => (
@@ -198,34 +269,42 @@ class App extends React.Component {
           postDate={post.date}
           likes={post.likes}
           postKey={post.key}
+          author={post.userName}
           handleLikes={this.handleLikes}
         />
       </Grid>
     ));
     return (
-      // <ThemeProvider theme={darkTheme}>
-      <div className="App">
-        <header className="App-header">
-          {/* <img src={logo} className="App-logo" alt="logo" /> */}
-          <Header changePage={this.changePage} />
+      <>
+        <div className="App">
+          <Header
+            changePage={this.changePage}
+            displayModal={this.handleModalOpen}
+            isLoggedIn={this.state.userUid}
+            handleSignOut={this.handleSignOut}
+            displayName={this.state.displayName}
+          />
           {this.state.currentPage === "chat" && (
             <MessageBox
               messageList={messageListItems}
               writeData={this.writeData}
             />
           )}
-
           {this.state.currentPage === "home" && (
             <>
-              <Container sx={{ marginTop: "100px" }} maxWidth="sm">
-                <SubmitPost
-                  handleFileInput={this.handleFileInput}
-                  handleUpload={this.handleUpload}
-                  uploadedFile={this.state.fileInput}
-                  previewLink={this.state.previewLink}
-                />
-              </Container>
-              <Container>
+              {this.state.userUid.length > 0 && (
+                <Container maxWidth="sm" sx={{ marginTop: "100px" }}>
+                  <SubmitPost
+                    handleFileInput={this.handleFileInput}
+                    handleUpload={this.handleUpload}
+                    uploadedFile={this.state.fileInput}
+                    previewLink={this.state.previewLink}
+                  />
+                </Container>
+              )}
+              <Container
+                sx={{ marginTop: this.state.userUid ? "20px" : "80px" }}
+              >
                 <Grid
                   container
                   alignContent="center"
@@ -237,9 +316,14 @@ class App extends React.Component {
               </Container>
             </>
           )}
-        </header>
-      </div>
-      // </ThemeProvider>
+        </div>
+        <Login
+          open={this.state.displayModal}
+          handleClose={this.handleModalClose}
+          updateDisplayName={this.updateDisplayName}
+          addUserToDb={this.addUserToDb}
+        />
+      </>
     );
   }
 }

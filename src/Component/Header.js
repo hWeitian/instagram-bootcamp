@@ -1,4 +1,5 @@
 import React from "react";
+import Login from "./Login";
 import { AppBar, Container, Toolbar, Typography, Button } from "@mui/material";
 
 class Header extends React.Component {
@@ -20,6 +21,7 @@ class Header extends React.Component {
             <Toolbar sx={{ justifyContent: "space-between" }}>
               <Typography variant="h5">Rocketgram</Typography>
               <div>
+                <Typography>{this.props.displayName}</Typography>
                 <Button
                   sx={{ color: "#fFFFFF" }}
                   onClick={() => this.handleClick("chat")}
@@ -31,6 +33,18 @@ class Header extends React.Component {
                   onClick={() => this.handleClick("home")}
                 >
                   Home
+                </Button>
+
+                <Button
+                  sx={{ color: "#fFFFFF" }}
+                  variant="contained"
+                  onClick={() =>
+                    this.props.isLoggedIn
+                      ? this.props.handleSignOut()
+                      : this.props.displayModal()
+                  }
+                >
+                  {this.props.isLoggedIn ? "Sign Out" : "Login / Singup"}
                 </Button>
               </div>
             </Toolbar>

@@ -41,7 +41,7 @@ class Post extends React.Component {
       <>
         <Card sx={{ maxWidth: 450, margin: "auto" }}>
           <CardHeader
-            title="Weitian"
+            title={this.props.author}
             subheader={this.props.postDate}
             avatar={
               <Avatar

@@ -49,8 +49,6 @@ class SubmitPost extends React.Component {
 
   handleSubmit = (event) => {
     event.preventDefault();
-    // console.log(event);
-    // this.inputValidation(this.props.uploadedFile);
 
     if (this.inputValidation(this.props.uploadedFile)) {
       this.props.handleUpload(this.state.caption);
