@@ -7,6 +7,7 @@ import {
   update,
   onValue,
   get,
+  remove,
 } from "firebase/database";
 import { uploadBytes, getDownloadURL, ref as sRef } from "firebase/storage";
 import { database, storage } from "./firebase";
@@ -19,8 +20,12 @@ import Post from "./Component/Post";
 import Header from "./Component/Header";
 import MessageBox from "./Component/MessageBox";
 import Login from "./Component/Login";
+import PostList from "./Component/PostList";
+import Home from "./Home";
+import AuthForm from "./Component/AuthForm";
 import { generateImageName, getCurrentDate, findPost, findUser } from "./utils";
 import { Container, Grid } from "@mui/material";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 
 // Save the Firebase message folder name as a constant to avoid bugs due to misspelling
 const DB_MESSAGES_KEY = "messages";
@@ -39,11 +44,11 @@ class App extends React.Component {
       imageUrl: "",
       posts: [],
       previewLink: "",
-      displayModal: false,
-      currentPage: "home",
+      // displayModal: false,
+      currentPage: "Home",
       userUid: "",
       displayName: "",
-      userKey: "",
+      profilePic: "",
     };
   }
 
@@ -65,30 +70,23 @@ class App extends React.Component {
     onValue(postsRef, (data) => {
       const newData = data.val();
       const newPosts = [];
-
-      // Get details of user who made the post
-      // const userUid = newData[property].userUid;
-      const userRef = ref(database, DB_USERS_KEY);
-
-      get(userRef).then((snapshot) => {
-        for (const property in newData) {
-          const uid = newData[property].userUid;
-          const user = findUser(snapshot.val(), uid);
-          newPosts.push({
-            key: newData[property].postKey,
-            caption: newData[property].caption,
-            imageLink: newData[property].imageLink,
-            date: newData[property].date,
-            likes: newData[property].likes,
-            userUid: newData[property].userUid,
-            userName: user.userName,
-          });
-        }
-        this.setState((state) => ({
-          // Store message key so we can use it as a key in our list items when rendering messages
-          posts: newPosts,
-        }));
-      });
+      for (const property in newData) {
+        newPosts.push({
+          postKey: newData[property].postKey,
+          caption: newData[property].caption,
+          imageLink: newData[property].imageLink,
+          date: newData[property].date,
+          likes: newData[property].likes,
+          userUid: newData[property].userUid,
+          userName: newData[property].userName,
+          usersLiked: newData[property].usersLiked,
+          profilePic: newData[property].profilePic,
+        });
+      }
+      this.setState((state) => ({
+        // Store message key so we can use it as a key in our list items when rendering messages
+        posts: newPosts,
+      }));
     });
 
     //Track user's login status
@@ -100,12 +98,14 @@ class App extends React.Component {
         this.setState({
           userUid: user.uid,
           displayName: user.displayName,
+          profilePic: user.photoURL,
         });
       } else {
         console.log("User signed out");
         this.setState({
           userUid: "",
           displayName: "",
+          profilePic: "",
         });
       }
     });
@@ -170,44 +170,61 @@ class App extends React.Component {
           likes: 0,
           postKey: newPostKey,
           userUid: this.state.userUid,
+          userName: this.state.displayName,
+          profilePic: this.state.profilePic,
         };
 
         set(newPostRef, post);
-
-        // this.setState({
-        //   imageUrl: "",
-        //   fileInput: "",
-        // });
+      })
+      .catch((error) => {
+        console.log(error);
       });
   };
 
-  addUserToDb = (userCredential, userName) => {
-    const usersListRef = ref(database, DB_USERS_KEY);
-    const newUserRef = push(usersListRef);
+  addUserToDb = (userCredential, userName, profilePic) => {
+    const usersListRef = ref(
+      database,
+      DB_USERS_KEY + "/" + userCredential.user.uid
+    );
+    //const newUserRef = push(usersListRef);
 
     const user = {
       userUid: userCredential.user.uid,
       userName: userName,
       postId: "",
-      userKey: newUserRef.key,
+      profilePicUrl: profilePic,
     };
-    set(newUserRef, user);
-
-    return newUserRef.key;
+    set(usersListRef, user);
   };
 
   handleLikes = (postKey, type) => {
-    // Get the database reference
-    const postListRef = ref(database, DB_POSTS_KEY);
+    const userUid = this.state.userUid;
 
     // Get the selected post from the post array state
     const requiredPost = findPost(this.state.posts, postKey);
 
+    // Get the database reference
+    const postListRef = ref(database, DB_POSTS_KEY);
+
     // Update the number likes for the selected post
-    if (type === "increase") {
-      requiredPost.likes += 1;
+    // If usersLiked object exist in post
+    if (requiredPost.usersLiked) {
+      // If user already liked the post,
+      // remove user Uid from usersLike and decrease likes count
+      if (requiredPost.usersLiked[userUid]) {
+        delete requiredPost.usersLiked[userUid];
+        requiredPost.likes -= 1;
+      } else {
+        // If user has not liked the post,
+        // add user Uid and increase likes count
+        requiredPost.usersLiked[userUid] = true;
+        requiredPost.likes += 1;
+      }
     } else {
-      requiredPost.likes -= 1;
+      // If usersLiked did not exist in requiredPost,
+      // add the object into requiredPost and increase likes count
+      requiredPost.usersLiked = { [userUid]: true };
+      requiredPost.likes += 1;
     }
 
     // Initiate an update object with postKey as the key and the updated post as value
@@ -223,22 +240,22 @@ class App extends React.Component {
     });
   };
 
-  handleModalClose = () => {
-    this.setState({
-      displayModal: false,
-    });
-  };
+  // handleModalClose = () => {
+  //   this.setState({
+  //     displayModal: false,
+  //   });
+  // };
 
-  handleModalOpen = () => {
-    this.setState({
-      displayModal: true,
-    });
-  };
+  // handleModalOpen = () => {
+  //   this.setState({
+  //     displayModal: true,
+  //   });
+  // };
 
-  updateDisplayName = (name, key) => {
+  updateUserInfo = (name, url) => {
     this.setState({
       displayName: name,
-      userKey: key,
+      profilePic: url,
     });
   };
 
@@ -262,35 +279,78 @@ class App extends React.Component {
       />
     ));
     let postItems = this.state.posts.map((post) => (
-      <Grid item sx={{ marginBottom: "20px", width: "100%" }} key={post.key}>
+      <Grid
+        item
+        sx={{ marginBottom: "20px", width: "100%" }}
+        key={post.postKey}
+      >
         <Post
           imgSrc={`${post.imageLink}`}
           caption={post.caption}
           postDate={post.date}
           likes={post.likes}
-          postKey={post.key}
+          postKey={post.postKey}
           author={post.userName}
           handleLikes={this.handleLikes}
+          hasLiked={post.usersLiked && post.usersLiked[this.state.userUid]}
+          userUid={this.state.userUid}
+          profilePic={post.profilePic}
         />
       </Grid>
     ));
+
     return (
       <>
         <div className="App">
-          <Header
-            changePage={this.changePage}
-            displayModal={this.handleModalOpen}
-            isLoggedIn={this.state.userUid}
-            handleSignOut={this.handleSignOut}
-            displayName={this.state.displayName}
-          />
-          {this.state.currentPage === "chat" && (
-            <MessageBox
-              messageList={messageListItems}
-              writeData={this.writeData}
+          <BrowserRouter>
+            <Home
+              changePage={this.changePage}
+              displayModal={this.handleModalOpen}
+              isLoggedIn={this.state.userUid}
+              handleSignOut={this.handleSignOut}
+              displayName={this.state.displayName}
+              profilePic={this.state.profilePic}
+              currentPage={this.state.currentPage}
             />
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <PostList
+                    postItems={postItems}
+                    userUid={this.state.userUid}
+                    fileInput={this.state.fileInput}
+                    previewLink={this.state.previewLink}
+                    handleFileInput={this.handleFileInput}
+                    handleUpload={this.handleUpload}
+                  />
+                }
+              />
+              <Route
+                path="/chat"
+                element={
+                  <MessageBox
+                    messageList={messageListItems}
+                    writeData={this.writeData}
+                  />
+                }
+              />
+              <Route
+                path="/authform"
+                element={<AuthForm updateUserInfo={this.updateUserInfo} />}
+              />
+            </Routes>
+          </BrowserRouter>
+
+          {/* {this.state.currentPage === "Chat" && (
+            <Container maxWidth="sm" sx={{ marginTop: "100px" }}>
+              <MessageBox
+                messageList={messageListItems}
+                writeData={this.writeData}
+              />
+            </Container>
           )}
-          {this.state.currentPage === "home" && (
+          {this.state.currentPage === "Home" && (
             <>
               {this.state.userUid.length > 0 && (
                 <Container maxWidth="sm" sx={{ marginTop: "100px" }}>
@@ -315,14 +375,14 @@ class App extends React.Component {
                 </Grid>
               </Container>
             </>
-          )}
+          )} */}
         </div>
-        <Login
+        {/* <Login
           open={this.state.displayModal}
           handleClose={this.handleModalClose}
-          updateDisplayName={this.updateDisplayName}
+          updateUserInfo={this.updateUserInfo}
           addUserToDb={this.addUserToDb}
-        />
+        /> */}
       </>
     );
   }

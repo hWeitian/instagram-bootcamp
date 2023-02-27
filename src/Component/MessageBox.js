@@ -29,7 +29,7 @@ class MessageBox extends React.Component {
   render() {
     return (
       <>
-        <Container maxWidth="sm" sx={{ marginTop: "20px" }}>
+        <Container maxWidth="sm" sx={{ marginTop: "0px" }}>
           <Paper sx={{ borderRadius: "10px" }}>
             <Container
               sx={{ maxHeight: "400px", overflowY: "scroll" }}

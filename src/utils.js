@@ -24,7 +24,7 @@ export const findPost = (postArr, postKey) => {
   let requiredPost = {};
 
   postArr.forEach((post) => {
-    if (post.key === postKey) {
+    if (post.postKey === postKey) {
       requiredPost = post;
     }
   });
@@ -47,7 +47,13 @@ export const setErrorMessage = (errorCode) => {
       errorMsg += "wrong Password, please try again";
       break;
     case "auth/user-not-found":
-      errorMsg = "unable to find user, please sign up a new account";
+      errorMsg += "unable to find user, please sign up a new account";
+      break;
+    case "auth/email-already-in-use":
+      errorMsg += "email has been used, please use another email";
+      break;
+    case "auth/weak-password":
+      errorMsg += "password too weak, please enter at least 6 characters";
       break;
     default:
       errorMsg = "";
